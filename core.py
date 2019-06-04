@@ -4,19 +4,29 @@ Core Function Code
 import numpy as np
 import pandas as pd
 
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
+
 class ResponseSurface:
-    def __init__(self,inputs,output,intercept = True, interaction = True):
-        self.degrees = [(1,0),(0,1),(2,0),(0,2)]
-        if intercept:
-            self.degrees.append((0,0))
-        if interaction:
-            self.degrees.append((1,1))
-        self.coef_matrix = np.stack([np.prod(inputs**d, axis=1) for d in self.degrees], axis=-1)
-        self.coef = np.linalg.lstsq(self.coef_matrix, output)[0]
+    def __init__(self,inputs,output,degree = 2, intercept = True, interaction_only = False):
+        X = inputs
+        y = output
+        
+        polynomial_features = PolynomialFeatures(degree=degree,
+                                                 interaction_only=interaction_only,
+                                                 include_bias=intercept)
+        x_poly = polynomial_features.fit_transform(X)
+    
+        model = LinearRegression()
+        model.fit(x_poly, y)
+        
+        self._polynomial_features = polynomial_features
+        self._x_poly = x_poly
+        self._model  = model
         
     def predict(self, input_pred):
-        grid_pred = np.stack([np.prod(input_pred**d, axis=1) for d in self.degrees], axis=-1)
-        pred = np.dot(grid_pred, self.coef)
+        input_poly = self._polynomial_features.fit_transform(input_pred)
+        pred = self._model.predict(input_poly)
         return pred
 
 def GenerateGrid(ResSur, varLims,selectvar):
