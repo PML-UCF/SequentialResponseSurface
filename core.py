@@ -93,46 +93,35 @@ def GenerateGrid(ResSur, varLims,selectvar):
     outputGrid = outputGrid.reshape(inputVar1.shape)
     return {'input1':inputVar1,'input2':inputVar2,'output':outputGrid}
 
-def DiagSampling(Grid,inputs,output,var1Lims,var2Lims,npoints):
-    aux = np.amax(Grid['output'],axis = 0)
-    index1 = np.where(Grid['output'] == np.max(aux))
-    index2 = np.where(Grid['output'] == np.min(aux))
+def NewSamples(inputs,outputs,varLims,n):
+    nvar = inputs.shape[-1]
     
-    slope = (Grid['input2'][index1]-Grid['input2'][index2])/(Grid['input1'][index1]-
-             Grid['input1'][index2])
+    trials = 1000
+    rdn = np.random.random(trials)
+    test_var = np.zeros((trials,nvar))
+    new = inputs.values
     
-    var1 = np.linspace(var1Lims[0],var1Lims[-1],npoints+1)
-    var1 = var1[1:npoints+1]
+    for i in range(nvar):
+        test_var[:,i] = rdn*(varLims[i,1]-varLims[i,0])+varLims[i,0]
     
-    var2 = Grid['input2'][index2] + slope*(var1-Grid['input1'][index2])
+    test_var = np.round(test_var,1)
     
-    var1 = np.round(var1,1)
-    var2 = np.round(var2,1)
+    d = np.zeros(test_var.shape[0])  
+    for k in range(test_var.shape[0]):
+        aux = abs(new-test_var[k,:])
+        d[k] = np.sqrt(np.sum(aux**2))
     
-    degrees = [(0,0),(1,0),(0,1),(1,1),(2,0),(0,2)]
-    coef_matrix = np.stack([np.prod(inputs**d, axis=1) for d in degrees], axis=-1)   # stack monomials like columns
-    coef = np.linalg.lstsq(coef_matrix, output)[0]
-    
-    pred = np.zeros(npoints)
-    
-    for i in range(npoints):
-        pred[i] = coef[0]+coef[1]*var1[i]+coef[2]*var2[i]+coef[3]*var1[i]*var2[i]+coef[4]*var1[i]**2+coef[5]*var2[i]**2
-
-    
-    return {'x1':var1,'x2':var2,'y':pred}
-
-def NewDOE(data,new):
-    nvar = data.shape[-1]-2
-    oldinput = data[["x{}".format(i+1) for i in range(nvar)]]
-    oldoutput = data['y']
-    new_length = new.shape[0]
-    newinput = np.array([new['x1'],new['x2']])
-    newinput = np.reshape(newinput, (new_length,2))
-    
-    inputs = np.row_stack((oldinput.values,newinput))
-    outputs = np.concatenate((oldoutput.values,np.zeros(new_length)))
-    
-    new_data = np.column_stack((inputs,outputs))
-    new_doe = pd.DataFrame(new_data, columns = ['x1','x2','y'])
-    return new_doe    
+    aux = np.argsort(d)
+    d = d[aux]
+    du,b = np.unique(d,return_index = True)
+    if b.shape[0]-n > 0:
+        new = np.row_stack((new,test_var[b[b.shape[0]-n:b.shape[0]],:]))  
+    else:
+        raise Warning('It was not possible to add '+str(n)+' new data points!')
+        new = np.row_stack((new,test_var[b,:]))
+        
+    new_data = pd.DataFrame(new, columns = ["x{}".format(i+1) for i in range(nvar)])
+    new_data['y'] = ''
+    new_data['y'].values[0:inputs.shape[0]] = outputs
+    return new_data   
     
