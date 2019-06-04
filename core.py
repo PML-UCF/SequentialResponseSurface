@@ -85,8 +85,8 @@ def GenerateGrid(ResSur, varLims,selectvar):
     n = np.shape(selectvar)[0]
     if n is not 2:
             raise ValueError('`GenerateGrid` only takes 2 distinct variables.')
-    gridVar1 = np.linspace(varLims[selectvar,0],varLims[selectvar,1],100)
-    gridVar2 = np.linspace(varLims[selectvar,0],varLims[selectvar,1],100)
+    gridVar1 = np.linspace(varLims[selectvar[0],0],varLims[selectvar[0],1],100)
+    gridVar2 = np.linspace(varLims[selectvar[1],0],varLims[selectvar[1],1],100)
     inputVar1, inputVar2 = np.meshgrid(gridVar1, gridVar2)
     inputGrid = np.stack([np.ravel(inputVar1),np.ravel(inputVar2)], axis = -1)
     outputGrid = np.array(ResSur.predict(inputGrid))
