@@ -6,73 +6,11 @@ import pandas as pd
 
 class ResponseSurface:
     def __init__(self,inputs,output,intercept = True, interaction = True):
-        nvar = inputs.shape[-1]
-        if nvar == 2:
-            self.degrees = [(1,0),(0,1),(2,0),(0,2)]
-            if intercept:
-                self.degrees.append((0,0))
-            if interaction:
-                self.degrees.append((1,1))
-        elif nvar == 3:
-            self.degrees = [(1,0,0),(0,0,1),(0,1,0)]
-            aux = [(1,0,0),(0,0,1),(0,1,0)]
-            npower = 3
-            for i in np.arange(2,npower+1):
-                aux2 = np.dot(aux,i)
-                for j in range(len(aux)):                    
-                    self.degrees.append(tuple(aux2[j]))
-            if intercept:
-                self.degrees.append((0,0,0))
-            if interaction:
-                aux3 = [(1,1,1),(1,1,0),(0,1,1),(1,0,1)]
-                for k in range(len(aux3)):
-                    self.degrees.append(tuple(aux3[k]))
-                for ii in np.arange(2,npower):
-                    aux4 = np.dot(aux3,ii)
-                    for jj in range(len(aux4)):                    
-                        self.degrees.append(tuple(aux4[jj]))
-        elif nvar == 4:
-            self.degrees = [(1,0,0,0),(0,0,0,1),(0,1,0,0),(0,0,1,0)]
-            aux = [(1,0,0,0),(0,0,0,1),(0,1,0,0),(0,0,1,0)]
-            npower = 4
-            for i in np.arange(2,npower+1):
-                aux2 = np.dot(aux,i)
-                for j in range(len(aux)):                    
-                    self.degrees.append(tuple(aux2[j]))
-            if intercept:
-                self.degrees.append((0,0,0,0))
-            if interaction:
-                aux3 = [(1,1,1,1),(1,1,1,0),(1,1,0,1),(1,0,1,1),(0,1,1,1),(1,1,0,0),
-                        (1,0,1,0),(1,0,0,1),(0,1,0,1),(0,0,1,1)]
-                for k in range(len(aux3)):
-                    self.degrees.append(tuple(aux3[k]))
-                for ii in np.arange(2,npower):
-                    aux4 = np.dot(aux3,ii)
-                    for jj in range(len(aux4)):                    
-                        self.degrees.append(tuple(aux4[jj]))
-        elif nvar == 5:
-            self.degrees = [(1,0,0,0,0),(0,0,0,0,1),(0,1,0,0,0),(0,0,1,0,0),(0,0,0,1,0)]
-            aux = [(1,0,0,0,0),(0,0,0,0,1),(0,1,0,0,0),(0,0,1,0,0),(0,0,0,1,0)]
-            npower = 4
-            for i in np.arange(2,npower+1):
-                aux2 = np.dot(aux,i)
-                for j in range(len(aux)):                    
-                    self.degrees.append(tuple(aux2[j]))
-            if intercept:
-                self.degrees.append((0,0,0,0,0))
-            if interaction:
-                aux3 = [(1,1,1,1,1),(1,1,1,1,0),(1,1,1,0,1),(1,1,0,1,1),(1,0,1,1,1),(0,1,1,1,1),
-                        (1,1,1,0,0),(1,1,0,1,0),(1,1,0,0,1),(1,0,1,0,1),(1,0,0,1,1),(0,1,0,1,1),
-                        (0,0,1,1,1),(1,1,0,0,0),(1,0,1,0,0),(1,0,0,1,0),(1,0,0,0,1),(0,1,0,0,1),
-                        (0,0,1,0,1),(0,0,0,1,1)]
-                for k in range(len(aux3)):
-                    self.degrees.append(tuple(aux3[k]))
-                for ii in np.arange(2,npower):
-                    aux4 = np.dot(aux3,ii)
-                    for jj in range(len(aux4)):                    
-                        self.degrees.append(tuple(aux4[jj]))
-        else:
-            raise ValueError('`ResponseSurface` can only manage a maximum of 5 distinct variables.')
+        self.degrees = [(1,0),(0,1),(2,0),(0,2)]
+        if intercept:
+            self.degrees.append((0,0))
+        if interaction:
+            self.degrees.append((1,1))
         self.coef_matrix = np.stack([np.prod(inputs**d, axis=1) for d in self.degrees], axis=-1)
         self.coef = np.linalg.lstsq(self.coef_matrix, output)[0]
         
@@ -97,28 +35,24 @@ def NewSamples(inputs,outputs,varLims,n):
     nvar = inputs.shape[-1]
     
     trials = 1000
-    rdn = np.random.random(trials)
+    rdn = np.random.random((trials,nvar))
     test_var = np.zeros((trials,nvar))
     new = inputs.values
     
     for i in range(nvar):
-        test_var[:,i] = rdn*(varLims[i,1]-varLims[i,0])+varLims[i,0]
+        test_var[:,i] = rdn[:,i]*(varLims[i,1]-varLims[i,0])+varLims[i,0]
     
     test_var = np.round(test_var,1)
     
-    d = np.zeros(test_var.shape[0])  
-    for k in range(test_var.shape[0]):
-        aux = abs(new-test_var[k,:])
-        d[k] = np.sqrt(np.sum(aux**2))
-    
-    aux = np.argsort(d)
-    d = d[aux]
-    du,b = np.unique(d,return_index = True)
-    if b.shape[0]-n > 0:
-        new = np.row_stack((new,test_var[b[b.shape[0]-n:b.shape[0]],:]))  
-    else:
-        raise Warning('It was not possible to add '+str(n)+' new data points!')
-        new = np.row_stack((new,test_var[b,:]))
+    for j in range(n):
+        d = np.zeros((new.shape[0],test_var.shape[0]))
+        for k in range(test_var.shape[0]):
+            d[:,k] = np.sqrt(np.sum(abs(new-test_var[k,:])**2, axis = 1))    
+        dist = np.min(d, axis = 0)
+        adist = np.argmax(dist) 
+        new = np.row_stack((new,test_var[adist,:]))
+        idx = np.where(dist == dist[adist])
+        test_var = np.delete(test_var, (idx), axis = 0)
         
     new_data = pd.DataFrame(new, columns = ["x{}".format(i+1) for i in range(nvar)])
     new_data['y'] = ''
